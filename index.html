@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medicine Checker with Hash and Chart</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body {
+            margin: 20px;
+            background-color: #f8f9fa;
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .form-section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 10px;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        .chart-container {
+            width: 80%;
+            margin: 0 auto;
+        }
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Medicine Checker with Hash & Chart</h2>
+
+    <div class="container form-section">
+        <form id="medicineForm">
+            <!-- Name Entry -->
+            <div class="form-group">
+                <label for="checkerName">Checker Name:</label>
+                <input type="text" class="form-control" id="checkerName" required>
+            </div>
+
+            <div class="form-group">
+                <label for="billNumber">Bill Number:</label>
+                <input type="text" class="form-control" id="billNumber" required>
+            </div>
+
+            <!-- Buttons for Error Type -->
+            <div class="form-group">
+                <label>Select Error Type:</label><br>
+                <button type="button" class="btn btn-warning" onclick="selectError('Batch Number')">Batch Number Error</button>
+                <button type="button" class="btn btn-warning" onclick="selectError('MRP')">MRP Error</button>
+                <button type="button" class="btn btn-warning" onclick="selectError('Carat')">Carat Error</button>
+            </div>
+
+            <!-- Comment Box -->
+            <div class="form-group">
+                <label for="comment">Comment:</label>
+                <textarea class="form-control" id="comment" maxlength="1000" required></textarea>
+            </div>
+
+            <!-- Rack Selection -->
+            <div class="form-group">
+                <label for="rack">Select Rack:</label>
+                <select class="form-control" id="rack" required>
+                    <option value="">Select Rack</option>
+                    <option value="A">Rack A</option>
+                    <option value="B">Rack B</option>
+                    <option value="C">Rack C</option>
+                    <option value="D">Rack D</option>
+                    <option value="E">Rack E</option>
+                    <option value="F">Rack F</option>
+                    <option value="G">Rack G</option>
+                    <option value="H">Rack H</option>
+                    <option value="I">Rack I</option>
+                    <option value="J">Rack J</option>
+                    <option value="K">Rack K</option>
+                    <option value="L">Rack L</option>
+                    <option value="M">Rack M</option>
+                    <option value="N">Rack N</option>
+                    <option value="O">Rack O</option>
+                    <option value="P">Rack P</option>
+                    <option value="Q">Rack Q</option>
+                    <option value="Cold">Cold Rack</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+
+        <button class="btn btn-dark mt-3" id="generateHash">Generate and Copy Hash</button>
+        <input type="text" id="hashDisplay" class="form-control mt-2" readonly>
+    </div>
+
+    <!-- Table and Chart -->
+    <div class="container">
+        <h3>Entries</h3>
+        <table id="medicineTable">
+            <thead>
+                <tr>
+                    <th>Checker Name</th>
+                    <th>Bill Number</th>
+                    <th>Error Type</th>
+                    <th>Comment</th>
+                    <th>Rack</th>
+                    <th>Edit</th>
+                    <th>Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Chart Section -->
+    <div class="chart-container mt-4">
+        <canvas id="rackChart"></canvas>
+    </div>
+
+    <footer>
+        Created by Yash K Pathak Rack (L)
+    </footer>
+
+    <script>
+        let selectedError = "";
+        let medicineData = localStorage.getItem('medicineData') ? JSON.parse(localStorage.getItem('medicineData')) : [];
+        let editIndex = -1;
+
+        // Form submission logic
+        document.getElementById('medicineForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const checkerName = document.getElementById('checkerName').value;
+            const billNumber = document.getElementById('billNumber').value;
+            const comment = document.getElementById('comment').value;
+            const rack = document.getElementById('rack').value;
+
+            if (!selectedError) {
+                alert('Please select an error type');
+                return;
+            }
+
+            const medicine = { checkerName, billNumber, selectedError, comment, rack };
+
+            if (editIndex > -1) {
+                medicineData[editIndex] = medicine;
+                editIndex = -1;
+            } else {
+                medicineData.push(medicine);
+            }
+
+            localStorage.setItem('medicineData', JSON.stringify(medicineData));
+
+            renderTable();
+            renderChart();
+            document.getElementById('medicineForm').reset();
+            selectedError = "";
+        });
+
+        function selectError(errorType) {
+            selectedError = errorType;
+        }
+
+        function renderTable() {
+            const tbody = document.querySelector('#medicineTable tbody');
+            tbody.innerHTML = '';
+            medicineData.forEach((item, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${item.checkerName}</td>
+                        <td>${item.billNumber}</td>
+                        <td>${item.selectedError}</td>
+                        <td>${item.comment}</td>
+                        <td>${item.rack}</td>
+                        <td><button class="btn btn-info" onclick="editEntry(${index})">Edit</button></td>
+                        <td><button class="btn btn-danger" onclick="deleteEntry(${index})">Delete</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function editEntry(index) {
+            const medicine = medicineData[index];
+            document.getElementById('checkerName').value = medicine.checkerName;
+            document.getElementById('billNumber').value = medicine.billNumber;
+            document.getElementById('comment').value = medicine.comment;
+            document.getElementById('rack').value = medicine.rack;
+            selectedError = medicine.selectedError;
+            editIndex = index;
+        }
+
+        function deleteEntry(index) {
+            medicineData.splice(index, 1);
+            localStorage.setItem('medicineData', JSON.stringify(medicineData));
+            renderTable();
+            renderChart();
+        }
+
+        // Chart rendering logic
+        function renderChart() {
+            const rackData = {};
+            medicineData.forEach(item => {
+                rackData[item.rack] = (rackData[item.rack] || 0) + 1;
+            });
+
+            const ctx = document.getElementById('rackChart').getContext('2d');
+            const chartData = {
+                labels: Object.keys(rackData),
+                datasets: [{
+                    label: 'Errors by Rack',
+                    data: Object.values(rackData),
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            };
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Generate hash and copy it
+        document.getElementById('generateHash').addEventListener('click', function() {
+            const dataString = JSON.stringify(medicineData);
+            const hash = CryptoJS.SHA256(dataString).toString();
+            
+            // Save hash and data in localStorage so it can be accessed on other devices
+            localStorage.setItem('generatedHash', hash);
+            localStorage.setItem('hashData', dataString);
+
+            document.getElementById('hashDisplay').value = hash;
+            navigator.clipboard.writeText(hash).then(() => {
+                alert("Hash copied to clipboard!");
+            });
+        });
+
+        renderTable();
+        renderChart();
+    </script>
+</body>
+</html>
